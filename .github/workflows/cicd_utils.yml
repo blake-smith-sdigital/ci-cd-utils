@@ -36,7 +36,6 @@ jobs:
             }
 
             // If multiple version labels exist, use the highest one
-            // Sort version labels semantically
             versionLabels.sort((a, b) => {
               // Substrings to remove the "v" prefix
               const [aMajor, aMinor] = a.substring(1).split('.').map(Number);
@@ -90,4 +89,4 @@ jobs:
               }
             }
             
-            console.log(`Successfully created version label ${newVersion} (if it didn't already exist)`);
+            console.log(`Successfully created version label ${newVersion}`);
