@@ -69,13 +69,17 @@ jobs:
             const newVersion = '${{ steps.increment-version.outputs.new_version }}';
             
             try {
+              // Create timestap for label creation
+              const now = new Date();
+              const formattedDate = now.toISOString().split('T')[0];
+
               // Create a new label with the incremented version
               await github.rest.issues.createLabel({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 name: newVersion,
                 color: '0366d6', // We can change this color if needed
-                description: `Release Version ${newVersion}`
+                description: `Release Version ${newVersion} - Created: ${formattedDate}`
               });
               console.log(`Created new label: ${newVersion}`);
             } catch (error) {
