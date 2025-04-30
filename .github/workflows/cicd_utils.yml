@@ -79,7 +79,7 @@ jobs:
                 repo: context.repo.repo,
                 name: newVersion,
                 color: '0366d6', // We can change this color if needed
-                description: `Release Version ${newVersion} - Created: ${formattedDate}`
+                description: `Release: ${newVersion} - On: ${formattedDate}`
               });
               console.log(`Created new label: ${newVersion}`);
             } catch (error) {
