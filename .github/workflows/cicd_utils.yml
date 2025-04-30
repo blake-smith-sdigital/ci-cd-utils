@@ -1,65 +1,91 @@
-name: Auto Increment Release Versioning
+name: Auto Increment Version Label
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches:
-      - main
+      - main  # Change this to your target branch (e.g., main, master, release)
 
-jobs: 
-  create-tag:
+jobs:
+  create-next-version-label:
+    # Only run this job when PR is merged (not just closed without merging)
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-
-      steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+      pull-requests: write
+      issues: write
+      contents: read
+    
+    steps:
+      - name: Get and increment version from PR labels
+        id: increment-version
+        uses: actions/github-script@v6
         with:
-          fetch-depth: 0 # This fetches all history so we can get the latest tag
-
-      - name: Get latest tag
-        id: get_latest_tag
-        run: |
-          # Get the latest tag that matches version format (e.g., 3.15)
-          LATEST_TAG=$(git tag -l | grep -E '^[0-9]+\.[0-9]+$' | sort -V | tail -n 1)
-          
-          # TODO bs can probably remove this after testing
-          if [ -z "$LATEST_TAG" ]; then
-            echo "No existing version tag found. Using 0.1 as the starting point."
-            LATEST_TAG="0.1"
-          fi
-          
-          echo "latest_tag=$LATEST_TAG" >> $GITHUB_OUTPUT
-          echo "Latest tag: $LATEST_TAG"
+          script: |
+            // Get labels from the merged PR
+            const prLabels = context.payload.pull_request.labels;
+            
+            // Find version labels (matching pattern X.Y)
+            const versionPattern = /^(\d+)\.(\d+)$/;
+            const versionLabels = prLabels
+              .filter(label => versionPattern.test(label.name))
+              .map(label => label.name);
+            
+            if (versionLabels.length === 0) {
+              console.log("No version label found on PR. Using 0.1 as starting point.");
+              core.setOutput("latest_version", "0.1");
+              core.setOutput("new_version", "0.2");
+              return;
+            }
+            
+            // If multiple version labels exist, use the highest one
+            // Sort version labels semantically
+            versionLabels.sort((a, b) => {
+              const [aMajor, aMinor] = a.split('.').map(Number);
+              const [bMajor, bMinor] = b.split('.').map(Number);
+              
+              if (aMajor !== bMajor) {
+                return aMajor - bMajor;
+              }
+              return aMinor - bMinor;
+            });
+            
+            const latestVersion = versionLabels[versionLabels.length - 1];
+            console.log(`Found version label on PR: ${latestVersion}`);
+            
+            // Increment the version
+            const [major, minor] = latestVersion.split('.').map(Number);
+            const newMinor = minor + 1;
+            const newVersion = `${major}.${newMinor}`;
+            
+            console.log(`New version label will be: ${newVersion}`);
+            core.setOutput("latest_version", latestVersion);
+            core.setOutput("new_version", newVersion);
       
-      - name: Increment version
-        id: increment_version
-        run: |
-          LATEST_TAG=${{ steps.get-latest-tag.outputs.latest_tag }}
-          
-          # Split into major and minor parts
-          MAJOR=$(echo $LATEST_TAG | cut -d. -f1)
-          MINOR=$(echo $LATEST_TAG | cut -d. -f2)
-          
-          # Increment the minor version
-          NEW_MINOR=$((MINOR + 1))
-          
-          # Create the new version tag
-          NEW_TAG="${MAJOR}.${NEW_MINOR}"
-          
-          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-          echo "New tag will be: $NEW_TAG"
-      
-      - name: Create new tag
-        run: |
-          NEW_TAG=${{ steps.increment-version.outputs.new_tag }}
+      - name: Create new version label
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const newVersion = '${{ steps.increment-version.outputs.new_version }}';
             
-            # Create a new tag
-            # These credentials are geenric identifiers that we can leave for github.
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
+            try {
+              // Create a new label with the incremented version
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: newVersion,
+                color: '0366d6', // We can change this color if needed
+                description: `Version ${newVersion}`
+              });
+              console.log(`Created new label: ${newVersion}`);
+            } catch (error) {
+              // If label already exists, just log and continue
+              console.log(`Note: Label ${newVersion} may already exist: ${error.message}`);
+              if (error.status !== 422) { // 422 means label already exists
+                throw error;
+              }
+            }
             
-            git tag -a $NEW_TAG -m "Release version $NEW_TAG"
-            git push origin $NEW_TAG
+            console.log(`Successfully created version label ${newVersion} (if it didn't already exist)`);
             
-            echo "Successfully created and pushed tag: $NEW_TAG"
+            // The next PR to this branch can now use this label
