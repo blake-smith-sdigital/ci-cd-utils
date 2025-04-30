@@ -23,8 +23,8 @@ jobs:
             // Get labels from the merged PR
             const prLabels = context.payload.pull_request.labels;
             
-            // Find version labels (matching pattern X.Y)
-            const versionPattern = /^(\d+)\.(\d+)$/;
+            // Find version labels (matching pattern vX.Y)
+            const versionPattern = /^v(\d+)\.(\d+)$/;
             const versionLabels = prLabels
               .filter(label => versionPattern.test(label.name))
               .map(label => label.name);
@@ -38,8 +38,9 @@ jobs:
             // If multiple version labels exist, use the highest one
             // Sort version labels semantically
             versionLabels.sort((a, b) => {
-              const [aMajor, aMinor] = a.split('.').map(Number);
-              const [bMajor, bMinor] = b.split('.').map(Number);
+              // Substrings to remove the "v" prefix
+              const [aMajor, aMinor] = a.substring(1).split('.').map(Number);
+              const [bMajor, bMinor] = b.substring(1).split('.').map(Number);
               
               if (aMajor !== bMajor) {
                 return aMajor - bMajor;
@@ -51,9 +52,9 @@ jobs:
             console.log(`Found version label on PR: ${latestVersion}`);
             
             // Increment the version
-            const [major, minor] = latestVersion.split('.').map(Number);
+            const [major, minor] = latestVersion.substring(1).split('.').map(Number); // Remove 'v' prefix
             const newMinor = minor + 1;
-            const newVersion = `${major}.${newMinor}`;
+            const newVersion = `v${major}.${newMinor}`;
             
             console.log(`New version label will be: ${newVersion}`);
             core.setOutput("latest_version", latestVersion);
