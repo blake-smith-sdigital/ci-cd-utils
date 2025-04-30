@@ -31,13 +31,6 @@ jobs:
               .filter(label => versionPattern.test(label.name))
               .map(label => label.name);
             
-            if (versionLabels.length === 0) {
-              console.log("No version label found on PR. Using 0.1 as starting point.");
-              core.setOutput("latest_version", "0.1");
-              core.setOutput("new_version", "0.2");
-              return;
-            }
-            
             // If multiple version labels exist, use the highest one
             // Sort version labels semantically
             versionLabels.sort((a, b) => {
@@ -87,5 +80,3 @@ jobs:
             }
             
             console.log(`Successfully created version label ${newVersion} (if it didn't already exist)`);
-            
-            // The next PR to this branch can now use this label
