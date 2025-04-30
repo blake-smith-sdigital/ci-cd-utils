@@ -2,14 +2,12 @@ name: Auto Increment Version Label
 
 on:
   pull_request:
-    types: [closed]
+    types: [opened]
     branches:
       - main  # Change this to your target branch (e.g., main, master, release)
 
 jobs:
   create-next-version-label:
-    # Only run this job when PR is merged (not just closed without merging)
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
