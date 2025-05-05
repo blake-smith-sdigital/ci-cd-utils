@@ -30,34 +30,24 @@ jobs:
             # const core = require('@actions/core');
             const axios = require('axios');
 
-            const comment = context.payload.comment;
-            const commentBody = comment.body;
-            const issue = context.payload.issue || context.payload.pull_request;
             const pullRequest = context.payload.pull_request;
-
+            
             let ticketKeys = [];
 
-            // 1. Try to get from the branch name
+            // Get ticket key only from the branch name
             if (pullRequest && pullRequest.head && pullRequest.head.ref) {
               const branchName = pullRequest.head.ref;
               const branchTicketKeyMatch = branchName.match(/(SCOM-\d+)/);
               if (branchTicketKeyMatch && branchTicketKeyMatch[1]) {
                 ticketKeys.push(branchTicketKeyMatch[1]);
                 core.info(`Found Jira ticket key in branch name: ${branchTicketKeyMatch[1]}`);
-              }
-            }
-
-            // 2. If not found in branch name, try to get from the comment body
-            if (ticketKeys.length === 0) {
-              const commentTicketKeyRegex = /(SCOM-\d+)/g;
-              const commentTicketKeyMatches = commentBody.match(commentTicketKeyRegex);
-              if (commentTicketKeyMatches && commentTicketKeyMatches.length > 0) {
-                ticketKeys = commentTicketKeyMatches;
-                core.info(`Found Jira ticket key(s) in comment: ${ticketKeys.join(', ')}`);
               } else {
-                core.info('No Jira ticket key found in branch name or comment, skipping.');
+                core.info('No Jira ticket key found in branch name, skipping.');
                 return;
               }
+            } else {
+              core.info('Could not access branch name, skipping.');
+              return;
             }
 
             const jiraBaseUrl = process.env.JIRA_BASE_URL;
@@ -71,7 +61,18 @@ jobs:
               'Content-Type': 'application/json',
             };
 
-            async function uploadCommentToJira(ticketKey, commentBody) {
+            // Prepare the comment content with PR details
+            let contentToUpload = '';
+            if (pullRequest) {
+              contentToUpload = `Pull Request #${pullRequest.number} was ${pullRequest.merged ? 'merged' : 'closed'}\n\n`;
+              contentToUpload += `Title: ${pullRequest.title}\n`;
+              if (pullRequest.body) {
+                contentToUpload += `Description: ${pullRequest.body}\n`;
+              }
+              contentToUpload += `URL: ${pullRequest.html_url}`;
+            }
+
+            async function uploadCommentToJira(ticketKey, commentContent) {
               const jiraCommentUrl = `${jiraBaseUrl}/rest/api/3/issue/${ticketKey}/comment`;
               const jiraCommentPayload = {
                 body: {
@@ -83,7 +84,7 @@ jobs:
                       content: [
                         {
                           type: 'text',
-                          text: commentBody,
+                          text: commentContent,
                         },
                       ],
                     },
@@ -102,10 +103,7 @@ jobs:
               }
             }
 
-            // Process each found ticket key
-            for (const ticketKey of [...new Set(ticketKeys)]) { // Use Set to avoid duplicate uploads if found in both
-              const commentContent = commentBody.startsWith(`${ticketKey}:`)
-                ? commentBody.substring(commentKey.indexOf(':') + 1).trim() // Remove the ticket number prefix from the comment
-                : commentBody;
-              await uploadCommentToJira(ticketKey, commentContent);
+            // Process the ticket key from branch name
+            for (const ticketKey of ticketKeys) {
+              await uploadCommentToJira(ticketKey, contentToUpload);
             }
