@@ -1,27 +1,22 @@
-name: Upload GitHub Comment to Jira
+name: Upload PR Description to Jira
 
 on:
-  # For comments on issues or PRs
-  issue_comment:
-    types: [created]
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
 
 jobs:
   upload_to_jira:
     runs-on: ubuntu-latest
     permissions:
-      issues: read
       pull-requests: read
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.13.0'
-
-      - name: Get comment details and upload to Jira
+      - name: Get PR description and upload to Jira
         uses: actions/github-script@v6
         env:
           JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
@@ -29,31 +24,39 @@ jobs:
         with:
           script: |
             (async () => {
-              const issue = context.payload.issue;
-              const comment = context.payload.comment;
+              const pullRequest = context.payload.pull_request;
               
-              if (!comment) {
-                core.info('No comment found, skipping.');
+              if (!pullRequest) {
+                core.info('No pull request found, skipping.');
                 return;
               }
               
-              const commentBody = comment.body;
-
+              const prDescription = pullRequest.body || '';
+              
+              if (!prDescription.trim()) {
+                core.info('PR description is empty, skipping.');
+                return;
+              }
+              
+              // Log info that we are processing
+              core.info('Processing PR description...');
+              
               let ticketKeys = [];
 
-              // We're now only focusing on comment text for ticket keys
-
-              // 2. If not found in branch name, try to extract from the comment body
-              if (ticketKeys.length === 0) {
-                const commentTicketKeyRegex = /(SCOM-\d+)/g;
-                const commentTicketKeyMatches = commentBody.match(commentTicketKeyRegex);
-                if (commentTicketKeyMatches && commentTicketKeyMatches.length > 0) {
-                  ticketKeys = commentTicketKeyMatches;
-                  core.info(`Found Jira ticket key(s) in comment: ${ticketKeys.join(', ')}`);
-                } else {
-                  core.info('No Jira ticket key found in branch name or comment, skipping.');
-                  return;
+              // Get ticker number from branchname
+              if (pullRequest.head && pullRequest.head.ref) {
+                const branchName = pullRequest.head.ref;
+                const branchTicketKeyMatch = branchName.match(/(SCOM-\d+)/);
+                if (branchTicketKeyMatch && branchTicketKeyMatch[1]) {
+                  ticketKeys.push(branchTicketKeyMatch[1]);
+                  core.info(`Found Jira Number: ${branchTicketKeyMatch[1]}`);
                 }
+              }
+
+              // Only use ticket numbers from branch name
+              if (ticketKeys.length === 0) {
+                core.info('No Jira ticket key found in branch name, skipping.');
+                return;
               }
 
               const jiraBaseUrl = process.env.JIRA_BASE_URL;
@@ -69,6 +72,15 @@ jobs:
 
               async function uploadCommentToJira(ticketKey, commentBody) {
                 const jiraCommentUrl = `${jiraBaseUrl}/rest/api/3/issue/${ticketKey}/comment`;
+                
+                // Format the comment to be more useful
+                const prLink = pullRequest.html_url;
+                const prTitle = pullRequest.title;
+                const prNumber = pullRequest.number;
+                const prStatus = pullRequest.merged ? 'merged' : 'closed';
+                
+                const jiraComment = `*PR #${prNumber}: "${prTitle}" was ${prStatus}*\n\n${commentBody}\n\n[View PR on GitHub|${prLink}]`;
+                
                 const jiraCommentPayload = {
                   body: {
                     type: 'doc',
@@ -79,7 +91,7 @@ jobs:
                         content: [
                           {
                             type: 'text',
-                            text: commentBody,
+                            text: jiraComment,
                           },
                         ],
                       },
@@ -95,9 +107,9 @@ jobs:
                   });
 
                   if (!response.ok) {
-                    const errorBody = await response.json();
+                    const errorBody = await response.text();
                     core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${response.status} - ${response.statusText}`);
-                    core.error(JSON.stringify(errorBody));
+                    core.error(errorBody);
                   } else {
                     core.info(`Successfully added comment to Jira ticket: ${ticketKey}`);
                   }
@@ -107,9 +119,9 @@ jobs:
               }
 
               for (const ticketKey of [...new Set(ticketKeys)]) {
-                const commentContent = commentBody.startsWith(`${ticketKey}:`)
-                  ? commentBody.substring(commentBody.indexOf(':') + 1).trim()
-                  : commentBody;
+                const commentContent = prDescription.startsWith(`${ticketKey}:`)
+                  ? prDescription.substring(prDescription.indexOf(':') + 1).trim()
+                  : prDescription;
                 await uploadCommentToJira(ticketKey, commentContent);
               }
             })();
