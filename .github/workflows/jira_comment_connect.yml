@@ -1,0 +1,112 @@
+name: Upload GitHub Comment to Jira
+
+on:
+  # issue_comment:
+  #   types: [created]
+  pull_request:
+    types: [closed]
+    branches:
+      - develop
+
+jobs:
+  upload_to_jira:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: read
+      pull-requests: read
+      repository_projects: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get comment details and upload to Jira
+        uses: actions/github-script@v6
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        with:
+          script: |
+            const github = require('@actions/github');
+            const core = require('@actions/core');
+            const axios = require('axios');
+
+            const comment = context.payload.comment;
+            const commentBody = comment.body;
+            const issue = context.payload.issue || context.payload.pull_request;
+            const pullRequest = context.payload.pull_request;
+
+            let ticketKeys = [];
+
+            // 1. Try to get from the branch name
+            if (pullRequest && pullRequest.head && pullRequest.head.ref) {
+              const branchName = pullRequest.head.ref;
+              const branchTicketKeyMatch = branchName.match(/(SCOM-\d+)/);
+              if (branchTicketKeyMatch && branchTicketKeyMatch[1]) {
+                ticketKeys.push(branchTicketKeyMatch[1]);
+                core.info(`Found Jira ticket key in branch name: ${branchTicketKeyMatch[1]}`);
+              }
+            }
+
+            // 2. If not found in branch name, try to get from the comment body
+            if (ticketKeys.length === 0) {
+              const commentTicketKeyRegex = /(SCOM-\d+)/g;
+              const commentTicketKeyMatches = commentBody.match(commentTicketKeyRegex);
+              if (commentTicketKeyMatches && commentTicketKeyMatches.length > 0) {
+                ticketKeys = commentTicketKeyMatches;
+                core.info(`Found Jira ticket key(s) in comment: ${ticketKeys.join(', ')}`);
+              } else {
+                core.info('No Jira ticket key found in branch name or comment, skipping.');
+                return;
+              }
+            }
+
+            const jiraBaseUrl = process.env.JIRA_BASE_URL;
+            const jiraApiToken = process.env.JIRA_API_TOKEN;
+
+            const authString = `:${jiraApiToken}`;
+            const encodedAuth = Buffer.from(authString).toString('base64');
+
+            const headers = {
+              'Authorization': `Basic ${encodedAuth}`,
+              'Content-Type': 'application/json',
+            };
+
+            async function uploadCommentToJira(ticketKey, commentBody) {
+              const jiraCommentUrl = `${jiraBaseUrl}/rest/api/3/issue/${ticketKey}/comment`;
+              const jiraCommentPayload = {
+                body: {
+                  type: 'doc',
+                  version: 1,
+                  content: [
+                    {
+                      type: 'paragraph',
+                      content: [
+                        {
+                          type: 'text',
+                          text: commentBody,
+                        },
+                      ],
+                    },
+                  ],
+                },
+              };
+
+              try {
+                const response = await axios.post(jiraCommentUrl, jiraCommentPayload, { headers });
+                core.info(`Successfully added comment to Jira ticket: ${ticketKey}`);
+              } catch (error) {
+                core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${error.message}`);
+                if (error.response && error.response.data) {
+                  core.error(JSON.stringify(error.response.data));
+                }
+              }
+            }
+
+            // Process each found ticket key
+            for (const ticketKey of [...new Set(ticketKeys)]) { // Use Set to avoid duplicate uploads if found in both
+              const commentContent = commentBody.startsWith(`${ticketKey}:`)
+                ? commentBody.substring(commentKey.indexOf(':') + 1).trim() // Remove the ticket number prefix from the comment
+                : commentBody;
+              await uploadCommentToJira(ticketKey, commentContent);
+            }
