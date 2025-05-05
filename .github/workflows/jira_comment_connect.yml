@@ -62,11 +62,12 @@ jobs:
               const jiraBaseUrl = process.env.JIRA_BASE_URL;
               const jiraApiToken = process.env.JIRA_API_TOKEN;
 
-              const authString = `automation@specialized.com:${jiraApiToken}`;
+              const authString = `blake.smith@specialized.com:${jiraApiToken}`;
               const encodedAuth = Buffer.from(authString).toString('base64');
 
               const headers = {
                 'Authorization': `Basic ${encodedAuth}`,
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
               };
 
