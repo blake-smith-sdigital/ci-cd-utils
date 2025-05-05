@@ -32,8 +32,6 @@ jobs:
         with:
           script: |
             (async () => {
-              const axios = require('axios');
-
               const comment = context.payload.comment;
               const commentBody = comment.body;
               const issue = context.payload.issue || context.payload.pull_request;
@@ -96,13 +94,21 @@ jobs:
                 };
 
                 try {
-                  const response = await axios.post(jiraCommentUrl, jiraCommentPayload, { headers });
-                  core.info(`Successfully added comment to Jira ticket: ${ticketKey}`);
+                  const response = await fetch(jiraCommentUrl, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(jiraCommentPayload),
+                  });
+
+                  if (!response.ok) {
+                    const errorBody = await response.json();
+                    core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${response.status} - ${response.statusText}`);
+                    core.error(JSON.stringify(errorBody));
+                  } else {
+                    core.info(`Successfully added comment to Jira ticket: ${ticketKey}`);
+                  }
                 } catch (error) {
                   core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${error.message}`);
-                  if (error.response && error.response.data) {
-                    core.error(JSON.stringify(error.response.data));
-                  }
                 }
               }
 
