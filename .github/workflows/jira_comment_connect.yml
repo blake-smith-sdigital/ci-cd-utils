@@ -14,7 +14,6 @@ jobs:
     permissions:
       issues: read
       pull-requests: read
-      repository_projects: read
 
     steps:
       - name: Checkout code
