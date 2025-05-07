@@ -32,6 +32,8 @@ jobs:
               }
               
               const prDescription = pullRequest.body || '';
+
+              console.log(`PR description: ${prDescription}`); // TODO bs
               
               if (!prDescription.trim()) {
                 core.info('PR description is empty, skipping.');
