@@ -125,5 +125,5 @@ jobs:
               }
               
               // Finally upload to Jira
-              await uploadCommentToJira(ticketKey, prDescription);
+              await uploadCommentToJira(ticketNumber, prDescription);
             })();
