@@ -41,20 +41,21 @@ jobs:
               // Log info that we are processing
               core.info('Processing PR description...');
               
-              let ticketKeys = [];
+              // let ticketKeys = [];
+              let ticketNumber = null;
 
               // Get ticker number from branchname
               if (pullRequest.head && pullRequest.head.ref) {
                 const branchName = pullRequest.head.ref;
-                const branchTicketKeyMatch = branchName.match(/(SCOM-\d+)/);
-                if (branchTicketKeyMatch && branchTicketKeyMatch[1]) {
-                  ticketKeys.push(branchTicketKeyMatch[1]);
-                  core.info(`Found Jira Number: ${branchTicketKeyMatch[1]}`);
+                const branchTicketNumberMatch = branchName.match(/(SCOM-\d+)/);
+                if (branchTicketNumberMatch && branchTicketNumberMatch[1]) {
+                  ticketNumber = branchTicketNumberMatch[1];
+                  core.info(`Found Jira Number: ${branchTicketNumberMatch[1]}`);
                 }
               }
 
               // Only use ticket numbers from branch name
-              if (ticketKeys.length === 0) {
+              if (ticketNumber) {
                 core.info('No Jira ticket key found in branch name, skipping.');
                 return;
               }
@@ -118,11 +119,7 @@ jobs:
                   core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${error.message}`);
                 }
               }
-
-              for (const ticketKey of [...new Set(ticketKeys)]) {
-                const commentContent = prDescription.startsWith(`${ticketKey}:`)
-                  ? prDescription.substring(prDescription.indexOf(':') + 1).trim()
-                  : prDescription;
-                await uploadCommentToJira(ticketKey, commentContent);
-              }
+              
+              // Finally upload to Jira
+              await uploadCommentToJira(ticketKey, prDescription);
             })();
