@@ -59,7 +59,7 @@ jobs:
 
               // Only use ticket numbers from branch name
               console.log(`Ticket number: ${ticketNumber}`); // TODO bs
-              if (ticketNumber) {
+              if (!ticketNumber) {
                 core.info('No Jira ticket key found in branch name, skipping.');
                 return;
               }
