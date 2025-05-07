@@ -48,6 +48,9 @@ jobs:
               if (pullRequest.head && pullRequest.head.ref) {
                 const branchName = pullRequest.head.ref;
                 const branchTicketNumberMatch = branchName.match(/(SCOM-\d+)/);
+
+                console.log(`Branch name: ${branchTicketNumberMatch}`); // TODO bs
+
                 if (branchTicketNumberMatch && branchTicketNumberMatch[1]) {
                   ticketNumber = branchTicketNumberMatch[1];
                   core.info(`Found Jira Number: ${branchTicketNumberMatch[1]}`);
@@ -55,6 +58,7 @@ jobs:
               }
 
               // Only use ticket numbers from branch name
+              console.log(`Ticket number: ${ticketNumber}`); // TODO bs
               if (ticketNumber) {
                 core.info('No Jira ticket key found in branch name, skipping.');
                 return;
