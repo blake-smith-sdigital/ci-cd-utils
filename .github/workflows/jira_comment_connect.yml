@@ -34,6 +34,19 @@ jobs:
               const prDescription = pullRequest.body || '';
 
               console.log(`PR description: ${prDescription}`); // TODO bs
+
+              const formatDescription = (description) => {
+                const markdown = description.replace(
+                  /<img\b[^>]*\balt="([^"]*)"[^>]*\bsrc="([^"]*)"[^>]*\/?>|<img\b[^>]*\bsrc="([^"]*)"[^>]*\balt="([^"]*)"[^>]*\/?>/gi,
+                  (match, alt1, src1, src2, alt2) => {
+                    const alt = alt1 || alt2 || '';
+                    const src = src1 || src2 || '';
+                    return `![${alt}](${src})`;
+                  }
+                );
+
+                return markdown;
+              }
               
               if (!prDescription.trim()) {
                 core.info('PR description is empty, skipping.');
@@ -126,6 +139,8 @@ jobs:
                 }
               }
               
+              const finalDescription = formatDescription(prDescription);
+
               // Finally upload to Jira
-              await uploadCommentToJira(ticketNumber, prDescription);
+              await uploadCommentToJira(ticketNumber, finalDescription);
             })();
