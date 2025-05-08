@@ -35,17 +35,27 @@ jobs:
 
               console.log(`PR description: ${prDescription}`); // TODO bs
 
+              // UTIL FUNCTIONS * * * * * * * * * * * *
               const formatDescription = (description) => {
                 const markdown = description.replace(
                   /<img\b[^>]*\balt="([^"]*)"[^>]*\bsrc="([^"]*)"[^>]*\/?>|<img\b[^>]*\bsrc="([^"]*)"[^>]*\balt="([^"]*)"[^>]*\/?>/gi,
                   (match, alt1, src1, src2, alt2) => {
                     const alt = alt1 || alt2 || '';
                     const src = src1 || src2 || '';
-                    return `![${alt}](${src})`;
+                    // return `![${alt}](${src})`; // TODO bs
+                    return `![${alt}]`; // Reference image name after uploading as attachment
                   }
                 );
 
                 return markdown;
+              }
+
+              const extractImageTags = (text) => {
+                // This regex matches <img ...> tags, including those with various attributes and spacing
+                const imgTagRegex = /<img\b[^>]*src=["'][^"']+["'][^>]*>/gi;
+                const matches = text.match(imgTagRegex);
+                // Return the array of img tags, or an empty array if none found
+                return matches || [];
               }
               
               if (!prDescription.trim()) {
@@ -56,8 +66,8 @@ jobs:
               // Log info that we are processing
               core.info('Processing PR description...');
               
-              // let ticketKeys = [];
               let ticketNumber = null;
+              const mediaFiles = extractImageTags(prDescription); // Gather all img tags to upload as attachments
 
               // Get ticker number from branchname
               if (pullRequest.head && pullRequest.head.ref) {
@@ -90,6 +100,63 @@ jobs:
                 'Accept': 'application/json',
                 'Content-Type': 'application/json',
               };
+
+              async function uploadMediaAttachments() {
+                const url = `${jiraBaseUrl}/rest/api/3/issue/${ticketNumber}/attachments`;
+
+                // Example: mediaFiles is an array of HTML strings
+                // const mediaFiles = [
+                //   '<img width="372" alt="Screenshot 2025-04-11 at 2 51 55PM" src="https://github.com/user-attachments/assets/8f536d26-b705-48ee-b16c-c839f4297137" />',
+                //   ...
+                // ];
+
+                const formData = new FormData();
+
+                for (const imgTag of mediaFiles) {
+                  // Extract src and alt attributes
+                  const srcMatch = imgTag.match(/src="([^"]+)"/);
+                  const altMatch = imgTag.match(/alt="([^"]*)"/);
+                  if (!srcMatch) continue; // Skip if no src found
+
+                  const imageUrl = srcMatch[1];
+                  const altText = altMatch ? altMatch[1].replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'attachment';
+
+                  // Download image as Blob
+                  const imageResponse = await fetch(imageUrl);
+                  if (!imageResponse.ok) {
+                    core.error(`Failed to download image from ${imageUrl}`);
+                    continue;
+                  }
+                  const imageBlob = await imageResponse.blob();
+
+                  // Append to FormData (Jira expects 'file' as the field name)
+                  formData.append('file', imageBlob, `${altText || 'attachment'}.png`);
+                }
+
+                // Prepare headers (do NOT set Content-Type, let fetch handle it)
+                const headers = {
+                  'Authorization': `Basic ${encodedAuth}`,
+                  'X-Atlassian-Token': 'no-check'
+                };
+
+                try {
+                  const response = await fetch(url, {
+                    method: 'POST',
+                    headers,
+                    body: formData
+                  });
+
+                  if (!response.ok) {
+                    const errorBody = await response.text();
+                    core.error(`Failed to upload media attachments: ${response.status} - ${response.statusText}`);
+                    core.error(errorBody);
+                  } else {
+                    core.info(`Successfully uploaded media attachments to Jira ticket: ${ticketNumber}`);
+                  }
+                } catch (error) {
+                  core.error(`Failed to upload media attachments: ${error.message}`);
+                }
+              }
 
               async function uploadCommentToJira(ticketKey, commentBody) {
                 const jiraCommentUrl = `${jiraBaseUrl}/rest/api/3/issue/${ticketKey}/comment`;
@@ -142,5 +209,6 @@ jobs:
               const finalDescription = formatDescription(prDescription);
 
               // Finally upload to Jira
+              await uploadMediaAttachments();
               await uploadCommentToJira(ticketNumber, finalDescription);
             })();
