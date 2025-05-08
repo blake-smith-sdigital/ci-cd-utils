@@ -14,5 +14,5 @@ outputs:
   jira_comment_uploaded:
     description: 'Indicates if the Jira comment was uploaded successfully.'
 runs:
-  using: 'node22' # Or a compatible Node.js version
+  using: 'node20' # Or a compatible Node.js version
   main: 'index.js'
