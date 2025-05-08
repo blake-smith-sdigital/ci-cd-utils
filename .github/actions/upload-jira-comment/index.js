@@ -1,0 +1,203 @@
+const core = require('@actions/core');
+const github = require('@actions/github');
+const FormData = require('form-data');
+const fetch = require('node-fetch');
+
+// UTIL FUNCTIONS * * * * * * * * * * * *
+const formatDescription = (description) => {
+  const markdown = description.replace(
+    /<img\b[^>]*\balt="([^"]*)"[^>]*\bsrc="([^"]*)"[^>]*\/?>|<img\b[^>]*\bsrc="([^"]*)"[^>]*\balt="([^"]*)"[^>]*\/?>/gi,
+    (match, alt1, src1, src2, alt2) => {
+      const alt = alt1 || alt2 || '';
+      const src = src1 || src2 || '';
+      // return `![${alt}](${src})`; // TODO bs
+      return `![${alt}]`; // Reference image name after uploading as attachment
+    }
+  );
+
+  return markdown;
+}
+
+const extractImageTags = (text) => {
+  // This regex matches <img ...> tags, including those with various attributes and spacing
+  const imgTagRegex = /<img\b[^>]*src=["'][^"']+["'][^>]*>/gi;
+  const matches = text.match(imgTagRegex);
+  // Return the array of img tags, or an empty array if none found
+  return matches || [];
+}
+
+async function run() {
+  try {
+    const pullRequestInput = core.getInput('pull_request');
+    const jiraBaseUrl = core.getInput('jira_base_url');
+    const jiraApiToken = core.getInput('jira_api_token');
+    const jiraUserEmail = core.getInput('jira_user_email');
+    const prDescription = pullRequest.body || '';
+
+              
+    if (!pullRequestInput) {
+      core.info('No pull request found, skipping.');
+      return;
+    }
+
+    const pullRequest = JSON.parse(pullRequestInput);
+
+    console.log(`PR description: ${prDescription}`); // TODO bs
+    
+    if (!prDescription.trim()) {
+      core.info('PR description is empty, skipping.');
+      return;
+    }
+    
+    // Log info that we are processing
+    core.info('Processing PR description...');
+    
+    let ticketNumber = null;
+    const mediaFiles = extractImageTags(prDescription); // Gather all img tags to upload as attachments
+
+    // Get ticker number from branchname
+    if (pullRequest.head && pullRequest.head.ref) {
+      const branchName = pullRequest.head.ref;
+      const branchTicketNumberMatch = branchName.match(/(SCOM-\d+)/);
+
+      console.log(`Branch name: ${branchTicketNumberMatch}`); // TODO bs
+
+      if (branchTicketNumberMatch && branchTicketNumberMatch[1]) {
+        ticketNumber = branchTicketNumberMatch[1];
+        core.info(`Found Jira Number: ${branchTicketNumberMatch[1]}`);
+      }
+    }
+
+    // Only use ticket numbers from branch name
+    console.log(`Ticket number: ${ticketNumber}`); // TODO bs
+    if (!ticketNumber) {
+      core.info('No Jira ticket key found in branch name, skipping.');
+      return;
+    }
+
+    const authString = `${jiraUserEmail}:${jiraApiToken}`;
+    const encodedAuth = Buffer.from(authString).toString('base64');
+
+    const headers = {
+      'Authorization': `Basic ${encodedAuth}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    async function uploadMediaAttachments() {
+      const url = `${jiraBaseUrl}/rest/api/3/issue/${ticketNumber}/attachments`;
+      const formData = new FormData();
+
+      for (const imgTag of mediaFiles) {
+        // Extract src and alt attributes
+        const srcMatch = imgTag.match(/src="([^"]+)"/);
+        const altMatch = imgTag.match(/alt="([^"]*)"/);
+        if (!srcMatch) continue; // Skip if no src found
+
+        const imageUrl = srcMatch[1];
+        const altText = altMatch ? altMatch[1].replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'attachment';
+
+        // Download image as Blob
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          core.error(`Failed to download image from ${imageUrl}`);
+          continue;
+        }
+        const imageBuffer = await imageResponse.buffer();
+
+        // Append to FormData (Jira expects 'file' as the field name)
+        formData.append('file', imageBuffer, { filename: `${altText || 'attachment'}.png` });
+      }
+
+      console.log('FORM DATA ', formData); // TODO bs
+
+      const formHeaders = formData.getHeaders();
+      const headers = {
+        ...formHeaders,
+        'Authorization': `Basic ${encodedAuth}`,
+        'X-Atlassian-Token': 'no-check'
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          core.error(`Failed to upload media attachments: ${response.status} - ${response.statusText}`);
+          core.error(errorBody);
+        } else {
+          core.info(`Successfully uploaded media attachments to Jira ticket: ${ticketNumber}`);
+        }
+      } catch (error) {
+        core.error(`Failed to upload media attachments: ${error.message}`);
+      }
+    }
+
+    async function uploadCommentToJira(ticketKey, commentBody) {
+      const jiraCommentUrl = `${jiraBaseUrl}/rest/api/3/issue/${ticketKey}/comment`;
+      
+      // Format the comment to be more useful
+      const prLink = pullRequest.html_url;
+      const prTitle = pullRequest.title;
+      const prNumber = pullRequest.number;
+      const prStatus = pullRequest.merged ? 'merged' : 'closed';
+      
+      const jiraComment = `*PR #${prNumber}: "${prTitle}" was ${prStatus}*\n\n${commentBody}\n\n[View PR on GitHub|${prLink}]`;
+      
+      const jiraCommentPayload = {
+        body: {
+          type: 'doc',
+          version: 1,
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: jiraComment,
+                },
+              ],
+            },
+          ],
+        },
+      };
+
+      try {
+        const response = await fetch(jiraCommentUrl, {
+          method: 'POST',
+          headers: headers,
+          body: JSON.stringify(jiraCommentPayload),
+        });
+
+        if (!response.ok) {
+          const errorBody = await response.text();
+          core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${response.status} - ${response.statusText}`);
+          core.error(errorBody);
+          core.setOutput('jira_comment_uploaded', 'false');
+        } else {
+          core.info(`Successfully added comment to Jira ticket: ${ticketKey}`);
+          core.setOutput('jira_comment_uploaded', 'true');
+        }
+      } catch (error) {
+        core.error(`Failed to add comment to Jira ticket ${ticketKey}: ${error.message}`);
+        core.setOutput('jira_comment_uploaded', 'false');
+      }
+    }
+    
+    const finalDescription = formatDescription(prDescription);
+
+    // Finally upload to Jira
+    await uploadMediaAttachments();
+    await uploadCommentToJira(ticketNumber, finalDescription);
+
+  } catch (error) {
+    core.setFailed(`An error occurred in the custom action: ${error.message}`);
+    core.setOutput('jira_comment_uploaded', 'false');
+  }
+}
+
+run();

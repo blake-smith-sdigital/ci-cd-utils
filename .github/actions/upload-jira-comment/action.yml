@@ -1,0 +1,18 @@
+name: 'Upload PR Description to Jira'
+description: 'Gets the description of a closed pull request and uploads it as a comment to a Jira ticket found in the description.'
+inputs:
+  pull_request:
+    description: 'The pull request object (context.payload.pull_request).'
+    required: true
+  jira_base_url:
+    description: 'The base URL of your Jira instance.'
+    required: true
+  jira_api_token:
+    description: 'The API token for Jira authentication.'
+    required: true
+outputs:
+  jira_comment_uploaded:
+    description: 'Indicates if the Jira comment was uploaded successfully.'
+runs:
+  using: 'node22' # Or a compatible Node.js version
+  main: 'index.js'
