@@ -18,7 +18,7 @@ jobs:
 
       - name: Get PR description and upload to Jira
         id: upload_jira_description
-        uses: ../actions/upload-jira-comment
+        uses: ./.github/actions/upload-jira-comment
         with:
           pull_request: ${{ toJSON(github.event.pull_request) }}
           jira_base_url: ${{ secrets.JIRA_BASE_URL }}
