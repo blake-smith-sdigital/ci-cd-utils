@@ -133,6 +133,8 @@ jobs:
                   formData.append('file', imageBlob, `${altText || 'attachment'}.png`);
                 }
 
+                console.log('FORM DATA ', formData); // TODO bs
+
                 // Prepare headers (do NOT set Content-Type, let fetch handle it)
                 const headers = {
                   'Authorization': `Basic ${encodedAuth}`,
