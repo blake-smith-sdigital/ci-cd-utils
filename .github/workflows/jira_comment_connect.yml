@@ -24,6 +24,10 @@ jobs:
         with:
           script: |
             (async () => {
+            const fs = require('node:fs');
+            const FormData = require('form-data');
+            const fetch = require('node-fetch');
+
               const pullRequest = context.payload.pull_request;
               
               if (!pullRequest) {
