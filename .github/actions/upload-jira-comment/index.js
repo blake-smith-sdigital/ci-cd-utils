@@ -36,8 +36,6 @@ async function run() {
     const jiraApiToken = core.getInput('jira_api_token');
     const jiraUserEmail = core.getInput('jira_user_email');
     const prDescription = pullRequest.body || '';
-
-    console.log('pullRequestInput ', pullRequestInput); // TODO bs
               
     if (!pullRequestInput) {
       core.info('No pull request found, skipping.');
@@ -117,9 +115,6 @@ async function run() {
           continue; // Skip to the next image
         }
       }
-    
-      // Debug: Check if 'file' field exists
-      console.log('FormData has file:', formData.has('file'));
     
       // Debug: Log FormData before fetch (may not show full content)
       console.log('FORM DATA before fetch:', formData);
