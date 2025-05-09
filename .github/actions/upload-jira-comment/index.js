@@ -111,26 +111,33 @@ async function run() {
     
           // Append to FormData (Jira expects 'file' as the field name)
           formData.append('file', buffer, { filename: `${altText || 'attachment'}.png` });
+          console.log('FORM DATA inside loop:', formData); // Debug: Log inside the loop
         } catch (error) {
           core.error(`Error processing image ${imageUrl}: ${error.message}`);
           continue; // Skip to the next image
         }
       }
     
-      // Log FormData (for debugging - remove in production)
-      // This might not show you the file content, but it will show the fields
-      console.log('FORM DATA:', formData);
+      // Debug: Check if 'file' field exists
+      console.log('FormData has file:', formData.has('file'));
+    
+      // Debug: Log FormData before fetch (may not show full content)
+      console.log('FORM DATA before fetch:', formData);
+    
+      const fetchOptions = {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${encodedAuth}`,
+          'X-Atlassian-Token': 'no-check',
+        },
+        body: formData,
+      };
+    
+      // Debug: Log fetch options
+      console.log('Fetch options:', fetchOptions);
     
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            ...formData.getHeaders(), // Get headers from formData
-            'Authorization': `Basic ${encodedAuth}`,
-            'X-Atlassian-Token': 'no-check',
-          },
-          body: formData,
-        });
+        const response = await fetch(url, fetchOptions);
     
         if (!response.ok) {
           const errorBody = await response.text();
