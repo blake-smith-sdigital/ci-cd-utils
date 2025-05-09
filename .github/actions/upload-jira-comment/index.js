@@ -34,6 +34,7 @@ async function run() {
     const jiraUserEmail = core.getInput('jira_user_email');
     const prDescription = pullRequestInput.body || '';
 
+    console.log('pullRequestInput ', pullRequestInput); // TODO bs
               
     if (!pullRequestInput) {
       core.info('No pull request found, skipping.');
