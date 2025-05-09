@@ -32,7 +32,7 @@ async function run() {
     const jiraBaseUrl = core.getInput('jira_base_url');
     const jiraApiToken = core.getInput('jira_api_token');
     const jiraUserEmail = core.getInput('jira_user_email');
-    const prDescription = pullRequest.body || '';
+    const prDescription = pullRequestInput.body || '';
 
               
     if (!pullRequestInput) {
