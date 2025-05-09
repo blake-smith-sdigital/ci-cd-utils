@@ -7,6 +7,9 @@ inputs:
   jira_base_url:
     description: 'The base URL of your Jira instance.'
     required: true
+  jira_user_email:
+    description: 'The email address of the Jira user for authentication.'
+    required: true
   jira_api_token:
     description: 'The API token for Jira authentication.'
     required: true
