@@ -119,6 +119,8 @@ async function run() {
         'X-Atlassian-Token': 'no-check'
       };
 
+      console.log('FORM DATA FOR ATTACHMENT ', formData); // TODO bs
+
       try {
         const response = await fetch(url, {
           method: 'POST',
