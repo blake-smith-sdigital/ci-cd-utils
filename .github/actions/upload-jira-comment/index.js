@@ -1,7 +1,8 @@
-const core = require('@actions/core');
-const github = require('@actions/github');
-const FormData = require('form-data');
-// const fetch = require('node-fetch');
+import * as core from '@actions/core';
+import * as github from '@actions/github';
+import FormData from 'form-data';
+import fetch from 'node-fetch';
+
 
 // UTIL FUNCTIONS * * * * * * * * * * * *
 const formatDescription = (description) => {
@@ -27,8 +28,6 @@ const extractImageTags = (text) => {
 }
 
 async function run() {
-  const fetch = require('node-fetch');
-  
   try {
     const pullRequestInput = core.getInput('pull_request'); // Returns a string
     const pullRequest = pullRequestInput ? JSON.parse(pullRequestInput) : null;

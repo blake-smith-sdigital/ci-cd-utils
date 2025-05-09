@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Uploads a comment to a Jira ticket.",
   "main": "index.js",
+  "type": "module",
   "scripts": {
     "start": "node index.js"
   },
