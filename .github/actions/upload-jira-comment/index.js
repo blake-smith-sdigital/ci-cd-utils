@@ -28,11 +28,12 @@ const extractImageTags = (text) => {
 
 async function run() {
   try {
-    const pullRequestInput = core.getInput('pull_request');
+    const pullRequestInput = core.getInput('pull_request'); // Returns a string
+    const pullRequest = pullRequestInput ? JSON.parse(pullRequestInput) : null;
     const jiraBaseUrl = core.getInput('jira_base_url');
     const jiraApiToken = core.getInput('jira_api_token');
     const jiraUserEmail = core.getInput('jira_user_email');
-    const prDescription = pullRequestInput.body || '';
+    const prDescription = pullRequest.body || '';
 
     console.log('pullRequestInput ', pullRequestInput); // TODO bs
               
@@ -40,8 +41,6 @@ async function run() {
       core.info('No pull request found, skipping.');
       return;
     }
-
-    const pullRequest = JSON.parse(pullRequestInput);
 
     console.log(`PR description: ${prDescription}`); // TODO bs
     
