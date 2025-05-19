@@ -88,6 +88,8 @@ async function run() {
       const url = `${jiraBaseUrl}/rest/api/3/issue/${ticketNumber}/attachments`;
       const formData = new FormData();
     
+      console.log('^ ^ ^ ^ mediaFiles ', mediaFiles)
+
       for (const imgTag of mediaFiles) {
         // Extract src and alt attributes
         const srcMatch = imgTag.match(/src="([^"]+)"/);
