@@ -99,47 +99,11 @@ async function run() {
     const authString = `${jiraUserEmail}:${jiraApiToken}`;
     const encodedAuth = Buffer.from(authString).toString('base64');
 
-    const headers = {
-      'Authorization': `Basic ${encodedAuth}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-    };
-
     async function uploadMediaAttachments() {
       const url = `${jiraBaseUrl}/rest/api/3/issue/${ticketNumber}/attachments`;
-      const formData = imagesToFormData(mediaFiles);
+      const formData = await imagesToFormData(mediaFiles);
     
       console.log('^ ^ ^ ^ mediaFiles ', mediaFiles)
-
-      // for (const imgTag of mediaFiles) {
-      //   // Extract src and alt attributes
-      //   const srcMatch = imgTag.match(/src="([^"]+)"/);
-      //   const altMatch = imgTag.match(/alt="([^"]*)"/);
-      //   if (!srcMatch) continue; // Skip if no src found
-    
-      //   const imageUrl = srcMatch[1];
-      //   const altText = altMatch ? altMatch[1].replace(/[^a-z0-9]/gi, '_').toLowerCase() : 'attachment';
-    
-      //   try {
-      //     // Download image as Buffer (using node-fetch)
-      //     const imageResponse = await fetch(imageUrl);
-      //     if (!imageResponse.ok) {
-      //       core.error(`Failed to download image from ${imageUrl}: ${imageResponse.status} - ${imageResponse.statusText}`);
-      //       continue;
-      //     }
-      //     const imageBuffer = await imageResponse.arrayBuffer(); // Get as ArrayBuffer
-      //     const buffer = Buffer.from(imageBuffer); // Convert to Node.js Buffer
-    
-      //     // Append to FormData (Jira expects 'file' as the field name)
-      //     formData.append('file', buffer, { filename: `${altText || 'attachment'}.png` });
-      //     console.log('FORM DATA inside loop:', formData); // Debug: Log inside the loop
-      //   } catch (error) {
-      //     core.error(`Error processing image ${imageUrl}: ${error.message}`);
-      //     continue; // Skip to the next image
-      //   }
-      // }
-    
-      // Debug: Log FormData before fetch (may not show full content)
       console.log('FORM DATA before fetch:', formData);
     
       const fetchOptions = {
@@ -201,7 +165,11 @@ async function run() {
       try {
         const response = await fetch(jiraCommentUrl, {
           method: 'POST',
-          headers: headers,
+          headers: {
+            'Authorization': `Basic ${encodedAuth}`,
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify(jiraCommentPayload),
         });
 
